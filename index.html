@@ -1,0 +1,847 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>棒球查經</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: 老式手翻記分板 — 上方逐局比分板，下方左側鑽石壘包、右側打擊/答題面板；單一深綠記分板風格（刻意不做亮色版） */
+:root{
+  --board:#123329;      /* 記分板綠 */
+  --board-deep:#0b231c;
+  --panel:#18402f;
+  --line:#2b5a47;
+  --chalk:#f1eee2;      /* 粉筆白 */
+  --chalk-dim:#a9bdb2;
+  --bulb:#ffb83f;       /* 燈泡琥珀 */
+  --stitch:#e0503f;     /* 縫線紅 */
+  --ok:#6fd39a;
+  --f-num:"Big Shoulders Display","Oswald","Arial Narrow",sans-serif;
+  --f-q:"LXGW WenKai TC","Noto Serif TC","PMingLiU",serif;
+  --f-ui:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--board-deep);color:var(--chalk);font-family:var(--f-ui);font-size:15px;line-height:1.55}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--bulb);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:14px 40px;display:flex;flex-direction:column;gap:14px}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{margin:0;font-family:var(--f-q);font-weight:700;font-size:1.7rem;letter-spacing:.08em}
+.brand small{font-family:var(--f-num);color:var(--bulb);letter-spacing:.18em;font-size:.95rem;text-transform:uppercase}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 14px;font-weight:500}
+.btn:hover{border-color:var(--chalk-dim)}
+.btn.primary{background:var(--bulb);color:#22180a;border-color:var(--bulb);font-weight:700}
+.btn.danger{border-color:var(--stitch);color:#ffb3a8}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* scoreboard */
+.board{background:var(--board);border:3px solid #26503f;border-radius:10px;padding:12px;box-shadow:inset 0 0 0 2px #0a1d17}
+.board-scroll{overflow-x:auto}
+table.line{border-collapse:separate;border-spacing:5px;width:100%;min-width:420px}
+.line th{font-family:var(--f-num);font-weight:600;color:var(--chalk-dim);font-size:.95rem;letter-spacing:.1em}
+.line td{background:var(--board-deep);text-align:center;font-family:var(--f-num);font-weight:800;font-size:1.9rem;line-height:1.25;border-radius:3px;min-width:2.2em;font-variant-numeric:tabular-nums}
+.line td.team{text-align:left;font-family:var(--f-ui);font-weight:700;font-size:1.05rem;padding:0 12px;white-space:nowrap;min-width:6em}
+.line td.team.bat::before{content:"";display:inline-block;width:.55em;height:.55em;background:var(--bulb);border-radius:50%;margin-right:.5em;box-shadow:0 0 8px var(--bulb)}
+.line td.now{outline:2px solid var(--bulb)}
+.line td.total{color:var(--bulb);background:#08180f}
+.line td.empty{color:#3d5f50}
+.status{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:0 5px}
+.status .lbl{font-family:var(--f-num);letter-spacing:.14em;color:var(--chalk-dim);font-size:.95rem;font-weight:600}
+.lights{display:inline-flex;gap:6px;vertical-align:middle;margin-left:6px}
+.lights i{width:16px;height:16px;border-radius:50%;background:#2a3f37;display:inline-block}
+.lights i.on{background:var(--stitch);box-shadow:0 0 10px var(--stitch)}
+.inning-tag{font-family:var(--f-num);font-weight:800;font-size:1.4rem;color:var(--bulb)}
+
+/* field + panel */
+.main{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:14px}
+@media (max-width:860px){.main{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--board);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.field svg{width:100%;height:auto;max-width:340px;display:block;margin:0 auto}
+.field .bat-team{text-align:center;font-weight:700;margin-top:4px}
+.field .bat-team span{color:var(--bulb)}
+
+.panel{display:flex;flex-direction:column;gap:14px;min-height:340px}
+.eyebrow{font-family:var(--f-num);letter-spacing:.16em;color:var(--chalk-dim);font-weight:600;font-size:.95rem;text-transform:uppercase}
+.choose{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hit{border:2px solid var(--line);background:var(--board-deep);border-radius:10px;padding:14px 12px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.hit:hover{border-color:var(--bulb)}
+.hit b{font-family:var(--f-num);font-size:2rem;line-height:1;color:var(--bulb)}
+.hit span{font-weight:700;font-size:1.1rem}
+.hit em{font-style:normal;color:var(--chalk-dim);font-size:.85rem}
+.hit.hr{border-color:#6a5223}
+.kbd{font-size:.8rem;color:var(--chalk-dim)}
+
+.qbox{display:flex;flex-direction:column;gap:14px}
+.qmeta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pill{display:inline-block;border-radius:999px;padding:2px 12px;font-weight:700;font-size:.9rem;background:var(--bulb);color:#22180a}
+.pill.mod{background:transparent;border:1px solid var(--stitch);color:#ffb3a8}
+.qtext{font-family:var(--f-q);font-size:clamp(1.4rem,3.2vw,2.3rem);line-height:1.5;text-wrap:balance;margin:0}
+.answer{border-top:1px dashed var(--line);padding-top:12px;font-family:var(--f-q);font-size:clamp(1.15rem,2.4vw,1.6rem);color:var(--ok)}
+.answer small{display:block;font-family:var(--f-ui);font-size:.85rem;color:var(--chalk-dim);margin-top:4px}
+.timer{font-family:var(--f-num);font-weight:800;font-size:2.2rem;font-variant-numeric:tabular-nums;color:var(--chalk);min-width:2.5ch;text-align:right}
+.timer.low{color:var(--stitch)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.big{font-size:1.1rem;padding:12px 22px;border-radius:8px}
+.btn.ok{background:#1f6b46;border-color:var(--ok);font-weight:700}
+.btn.ng{background:#6b2620;border-color:var(--stitch);font-weight:700}
+
+.special{border:2px solid var(--bulb);border-radius:12px;padding:18px;background:repeating-linear-gradient(135deg,#1b4535 0 12px,#183d2f 12px 24px);display:flex;flex-direction:column;gap:8px}
+.special h3{margin:0;font-family:var(--f-q);font-size:2rem;color:var(--bulb)}
+.special p{margin:0;font-size:1.05rem}
+.result{font-family:var(--f-q);font-size:clamp(1.3rem,3vw,2rem);margin:0}
+.result.good{color:var(--ok)}.result.bad{color:#ff9d8f}
+.sub{color:var(--chalk-dim);margin:0}
+
+.log{max-height:220px;overflow:auto;margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:.92rem}
+.log li{display:flex;gap:10px;border-bottom:1px solid #1f4737;padding-bottom:4px}
+.log li b{font-family:var(--f-num);color:var(--bulb);min-width:2.4em;font-variant-numeric:tabular-nums}
+.empty-note{color:var(--chalk-dim)}
+
+/* sheets (in-page dialogs) */
+.sheet{position:fixed;inset:0;background:rgba(3,12,9,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 24px) 12px 24px;overflow:auto;z-index:20}
+.sheet-in{background:var(--board);border:1px solid var(--line);border-radius:12px;width:min(760px,100%);padding:20px;display:flex;flex-direction:column;gap:14px}
+.sheet-in h2{margin:0;font-family:var(--f-q);font-size:1.5rem}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.grid2{grid-template-columns:minmax(0,1fr)}.choose{grid-template-columns:minmax(0,1fr)}}
+label{display:flex;flex-direction:column;gap:4px;font-size:.9rem;color:var(--chalk-dim)}
+input[type=text],select,textarea{background:var(--board-deep);border:1px solid var(--line);color:var(--chalk);border-radius:6px;padding:8px 10px;font:inherit;width:100%}
+textarea{min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:.88rem}
+label.check{flex-direction:row;align-items:center;gap:8px;color:var(--chalk)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px}
+.tabs button{border:0;background:none;padding:6px 12px;border-radius:6px;color:var(--chalk-dim);font-weight:500}
+.tabs button[aria-selected=true]{background:var(--panel);color:var(--chalk)}
+.qlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:48vh;overflow:auto}
+.qlist li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;background:var(--board-deep);border-radius:6px;padding:8px 10px}
+.qlist .lv{font-family:var(--f-num);font-weight:800;color:var(--bulb);font-size:1.1rem}
+.qlist .t{font-family:var(--f-q);font-size:1.02rem}
+.qlist .a{color:var(--chalk-dim);font-size:.88rem}
+.qlist button{border:0;background:none;color:#ff9d8f;font-size:.85rem}
+.counts{display:flex;gap:14px;flex-wrap:wrap;color:var(--chalk-dim);font-size:.9rem}
+.counts b{color:var(--chalk);font-family:var(--f-num);font-size:1.1rem}
+.note{font-size:.85rem;color:var(--chalk-dim);margin:0}
+.scope-chip{border:1px solid var(--line);background:var(--board-deep);border-radius:999px;padding:3px 12px;font-weight:700;display:inline-flex;gap:6px;align-items:baseline;max-width:100%}
+.scope-chip:hover{border-color:var(--bulb)}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.quick button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-size:.88rem}
+.quick button:hover{border-color:var(--bulb)}
+.bgroup{display:flex;flex-direction:column;gap:6px}
+.bgroup-h{display:flex;align-items:center;gap:10px}
+.bgroup-h .eyebrow{font-size:.85rem}
+.bgroup-h button{border:0;background:none;color:var(--bulb);font-size:.82rem;padding:0}
+.books{display:flex;flex-wrap:wrap;gap:6px}
+.bk{border:1px solid var(--line);background:var(--board-deep);border-radius:6px;padding:4px 10px;font-size:.92rem;display:inline-flex;gap:6px;align-items:baseline}
+.bk sup{font-size:.72rem;color:var(--chalk-dim);font-family:var(--f-num)}
+.bk[aria-pressed=true]{background:var(--bulb);color:#22180a;border-color:var(--bulb)}
+.bk[aria-pressed=true] sup{color:#4a3510}
+.scope-sum{background:var(--board-deep);border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;position:sticky;bottom:0}
+.scope-sum b{font-family:var(--f-num);font-size:1.2rem;color:var(--bulb)}
+.hit:disabled{opacity:.4;cursor:not-allowed}
+.hit:disabled:hover{border-color:var(--line)}
+.qlist .bkname{color:var(--bulb);font-size:.82rem}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--bulb);color:#22180a;font-weight:700;padding:8px 18px;border-radius:999px;z-index:30}
+@media (prefers-reduced-motion:no-preference){
+  .base-on{animation:pop .35s ease-out}
+  @keyframes pop{from{transform:scale(.4)}to{transform:scale(1)}}
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>棒球查經</h1><small>Bible Baseball</small></div>
+    <div class="tools">
+      <button class="btn" id="btnScope">經卷範圍</button>
+      <button class="btn" id="btnBank">題庫</button>
+      <button class="btn" id="btnSetup">新比賽</button>
+    </div>
+  </header>
+
+  <section class="board" aria-label="比分板">
+    <div class="board-scroll"><table class="line" id="lineScore"></table></div>
+    <div class="status">
+      <span class="inning-tag" id="inningTag"></span>
+      <span class="lbl">OUT<span class="lights" id="outLights"></span></span>
+      <button class="scope-chip" id="scopeTagBtn" title="更改經卷範圍"><span class="lbl">範圍</span> <span id="scopeTag"></span></button>
+      <span class="lbl" id="bankLeft"></span>
+    </div>
+  </section>
+
+  <section class="main">
+    <div class="card field">
+      <svg viewBox="0 0 200 190" role="img" aria-label="壘包狀態" id="diamond"></svg>
+      <div class="bat-team" id="batTeam"></div>
+    </div>
+    <div class="card panel" id="panel" aria-live="polite"></div>
+  </section>
+
+  <section class="card">
+    <div class="eyebrow" style="margin-bottom:8px">比賽紀錄</div>
+    <ul class="log" id="log"></ul>
+  </section>
+</div>
+
+<!-- 新比賽設定 -->
+<div class="sheet" id="setupSheet" hidden>
+  <form class="sheet-in" id="setupForm">
+    <h2>新比賽</h2>
+    <div class="grid2">
+      <label>先攻隊（客隊）<input type="text" id="tA" value="約書亞隊"></label>
+      <label>後攻隊（主隊）<input type="text" id="tB" value="迦勒隊"></label>
+      <label>局數
+        <select id="sInn"><option value="3">3 局</option><option value="5" selected>5 局</option><option value="7">7 局</option><option value="9">9 局</option></select>
+      </label>
+      <label>答題時間
+        <select id="sTime"><option value="0">不計時</option><option value="20">20 秒</option><option value="30" selected>30 秒</option><option value="45">45 秒</option><option value="60">60 秒</option></select>
+      </label>
+      <label>特殊牌出現機率
+        <select id="sCard"><option value="0">關閉特殊牌</option><option value="0.1">10%</option><option value="0.2" selected>20%</option><option value="0.3">30%</option></select>
+      </label>
+    </div>
+    <p class="note">每位打者上場前會依機率抽特殊牌：保送、三振、犧牲打、盜壘、雙殺危機、代打。</p>
+    <div class="row" style="align-items:center"><span class="note">經卷範圍：<b id="setupScope" style="color:var(--chalk)"></b></span><button type="button" class="btn" id="setupScopeBtn">更改</button></div>
+    <div class="row">
+      <button type="submit" class="btn primary">開始比賽</button>
+      <button type="button" class="btn" data-close="setupSheet">取消</button>
+    </div>
+  </form>
+</div>
+
+<!-- 經卷範圍 -->
+<div class="sheet" id="scopeSheet" hidden>
+  <div class="sheet-in">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2>經卷範圍</h2>
+      <button class="btn primary" id="scopeDone">套用</button>
+    </div>
+    <p class="note">選定的經卷會用在這場比賽的抽題，也是 AI 出題的預設範圍。不選任何經卷就是全本聖經。經卷旁的數字是題庫裡的題數。</p>
+    <div class="quick">
+      <button data-q="all">全本聖經</button>
+      <button data-q="ot">舊約</button>
+      <button data-q="nt">新約</button>
+      <button data-q="has">只選有題目的</button>
+    </div>
+    <div id="bookGroups" style="display:flex;flex-direction:column;gap:14px"></div>
+    <label class="check"><input type="checkbox" id="scopeGeneral"> 也抽綜合題（不屬於單一經卷，例如「新約共有幾卷？」）</label>
+    <div class="scope-sum" id="scopeSum"></div>
+  </div>
+</div>
+
+<!-- 題庫 -->
+<div class="sheet" id="bankSheet" hidden>
+  <div class="sheet-in">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2>題庫</h2>
+      <button class="btn" data-close="bankSheet">完成</button>
+    </div>
+    <div class="counts" id="bankCounts"></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="list" aria-selected="true">題目列表</button>
+      <button role="tab" data-tab="ai" aria-selected="false" id="tabAiBtn">AI 出題</button>
+      <button role="tab" data-tab="add" aria-selected="false">新增一題</button>
+      <button role="tab" data-tab="import" aria-selected="false">批次匯入</button>
+    </div>
+
+    <div data-pane="list">
+      <div class="row" style="margin-bottom:10px">
+        <select id="fLv" style="width:auto"><option value="0">全部等級</option><option value="1">一壘</option><option value="2">二壘</option><option value="3">三壘</option><option value="4">全壘打</option></select>
+        <select id="fBook" style="width:auto"></select>
+        <button class="btn" id="btnResetUsed">重置已用題目</button>
+        <button class="btn danger" id="btnRestore">還原內建題庫</button>
+      </div>
+      <ul class="qlist" id="qList"></ul>
+    </div>
+
+    <div data-pane="ai" hidden>
+      <div class="grid2">
+        <label>範圍（經卷、章節或主題）<input type="text" id="aiScope" value="使徒行傳 1–8 章"></label>
+        <label>對象
+          <select id="aiAud"><option>國小高年級</option><option selected>國高中青少年</option><option>大專青年</option><option>成人團契</option></select>
+        </label>
+        <label>每個等級題數
+          <select id="aiN"><option>3</option><option selected>5</option><option>8</option></select>
+        </label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="aiGo">產生題目</button>
+        <button class="btn" id="aiStop" hidden>停止</button>
+      </div>
+      <p class="note" id="aiStatus" style="margin-top:8px">依和合本出題，產生後可勾選要加入題庫的題目。請在比賽前核對經文。</p>
+      <ul class="qlist" id="aiList" style="margin-top:8px"></ul>
+      <div class="row" id="aiAddRow" hidden style="margin-top:10px">
+        <button class="btn primary" id="aiAdd">加入勾選的題目</button>
+      </div>
+    </div>
+
+    <div data-pane="add" hidden>
+      <form id="addForm" style="display:flex;flex-direction:column;gap:10px">
+        <label>等級
+          <select id="aLv"><option value="1">一壘安打（簡單）</option><option value="2">二壘安打（中等）</option><option value="3">三壘安打（難）</option><option value="4">全壘打（非常難）</option></select>
+        </label>
+        <label>題目<input type="text" id="aQ" required></label>
+        <label>答案<input type="text" id="aA" required></label>
+        <label>經文出處（選填）<input type="text" id="aR" placeholder="例：徒 2:1-4"></label>
+        <label>經卷<select id="aB"></select></label>
+        <div class="row"><button class="btn primary" type="submit">加入題庫</button></div>
+      </form>
+    </div>
+
+    <div data-pane="import" hidden>
+      <p class="note">每行一題：<code>等級|題目|答案|出處</code>。等級可寫 1–4 或 一壘／二壘／三壘／全壘打。經卷會從出處自動判斷（例如「徒 2:1」歸到使徒行傳）；沒寫出處的歸為綜合題。</p>
+      <textarea id="impText" placeholder="1|耶穌在哪裡出生？|伯利恆|太 2:1&#10;全壘打|說出摩西五經|創世記、出埃及記、利未記、民數記、申命記"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="impGo">匯入</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const LV = {
+  1:{name:'一壘安打', tag:'1B', bases:1, hint:'簡單'},
+  2:{name:'二壘安打', tag:'2B', bases:2, hint:'中等'},
+  3:{name:'三壘安打', tag:'3B', bases:3, hint:'難'},
+  4:{name:'全壘打',   tag:'HR', bases:4, hint:'非常難'}
+};
+const BOOK_GROUPS = [
+  ['舊約','摩西五經','創世記:創 出埃及記:出 利未記:利 民數記:民 申命記:申'],
+  ['舊約','歷史書','約書亞記:書 士師記:士 路得記:得 撒母耳記上:撒上 撒母耳記下:撒下 列王紀上:王上 列王紀下:王下 歷代志上:代上 歷代志下:代下 以斯拉記:拉 尼希米記:尼 以斯帖記:斯'],
+  ['舊約','詩歌智慧書','約伯記:伯 詩篇:詩 箴言:箴 傳道書:傳 雅歌:歌'],
+  ['舊約','大先知書','以賽亞書:賽 耶利米書:耶 耶利米哀歌:哀 以西結書:結 但以理書:但'],
+  ['舊約','小先知書','何西阿書:何 約珥書:珥 阿摩司書:摩 俄巴底亞書:俄 約拿書:拿 彌迦書:彌 那鴻書:鴻 哈巴谷書:哈 西番雅書:番 哈該書:該 撒迦利亞書:亞 瑪拉基書:瑪'],
+  ['新約','福音書','馬太福音:太 馬可福音:可 路加福音:路 約翰福音:約'],
+  ['新約','歷史','使徒行傳:徒'],
+  ['新約','保羅書信','羅馬書:羅 哥林多前書:林前 哥林多後書:林後 加拉太書:加 以弗所書:弗 腓立比書:腓 歌羅西書:西 帖撒羅尼迦前書:帖前 帖撒羅尼迦後書:帖後 提摩太前書:提前 提摩太後書:提後 提多書:多 腓利門書:門'],
+  ['新約','普通書信','希伯來書:來 雅各書:雅 彼得前書:彼前 彼得後書:彼後 約翰一書:約一 約翰二書:約二 約翰三書:約三 猶大書:猶'],
+  ['新約','預言','啟示錄:啟']
+].map(([t,g,s]) => ({t, g, books: s.split(' ').map(x => { const [name,abbr]=x.split(':'); return {name,abbr}; })}));
+const ALL_BOOKS = BOOK_GROUPS.flatMap(g => g.books.map(b => ({...b, t:g.t})));
+const GENERAL = '綜合';
+const ABBR_SORTED = [...ALL_BOOKS].sort((a,b)=>b.abbr.length-a.abbr.length);
+function inferBook(ref){
+  ref = String(ref||'').trim(); if (!ref) return '';
+  const full = ALL_BOOKS.find(b => ref.startsWith(b.name)); if (full) return full.name;
+  const m = ABBR_SORTED.find(b => ref.startsWith(b.abbr) && /^[\s\d一二三四五六七八九十（(]/.test(ref.slice(b.abbr.length) || ' '));
+  return m ? m.name : '';
+}
+function normBook(x, ref){
+  x = String(x||'').trim();
+  const hit = ALL_BOOKS.find(b => b.name===x || b.abbr===x);
+  return hit ? hit.name : (inferBook(ref) || GENERAL);
+}
+const DEFAULT_Q = [
+ [1,'聖經的第一卷書是哪一卷？','創世記',''],
+ [1,'神用幾天創造天地萬物，第七天安息？','六天','創 1–2'],
+ [1,'神吩咐誰建造方舟？','挪亞','創 6'],
+ [1,'耶穌在哪裡出生？','伯利恆','太 2:1'],
+ [1,'耶穌揀選了幾位使徒？','十二位','太 10:1-4'],
+ [1,'用機弦甩石打倒歌利亞的是誰？','大衛','撒上 17'],
+ [1,'被丟進獅子坑卻平安無事的是誰？','但以理','但 6'],
+ [1,'被大魚吞下、在魚腹中三日三夜的先知是誰？','約拿','拿 1:17'],
+ [1,'帶領以色列人出埃及的是誰？','摩西','出 3'],
+ [1,'新約的第一卷書是哪一卷？','馬太福音',''],
+ [1,'出賣耶穌的門徒是誰？','加略人猶大','太 26:14-16'],
+ [1,'在約旦河為耶穌施洗的是誰？','施洗約翰','太 3:13'],
+ [2,'神把十條誡命寫在什麼上面？','兩塊石版','出 31:18'],
+ [2,'亞伯拉罕年老時得的應許之子叫什麼名字？','以撒','創 21:3'],
+ [2,'雅各與神摔跤後被改名為什麼？','以色列','創 32:28'],
+ [2,'耶穌行的第一件神蹟是什麼？','在迦拿的婚筵上變水為酒','約 2:1-11'],
+ [2,'耶穌用五餅二魚餵飽了大約多少男人？','約五千人','太 14:21'],
+ [2,'在雞叫以前三次不認主的門徒是誰？','彼得','太 26:69-75'],
+ [2,'保羅歸主以前叫什麼名字？','掃羅','徒 13:9'],
+ [2,'以色列人在曠野每天早晨撿拾的食物叫什麼？','嗎哪','出 16:31'],
+ [2,'路得的婆婆叫什麼名字？','拿俄米','得 1'],
+ [2,'以色列人繞城七天後城牆倒塌的是哪一座城？','耶利哥','書 6'],
+ [2,'聖靈降臨在門徒身上是在什麼節期？','五旬節','徒 2:1-4'],
+ [2,'舊約聖經共有幾卷？','39 卷',''],
+ [3,'「愛是恆久忍耐，又有恩慈」出自哪一卷書第幾章？','哥林多前書 13 章','林前 13:4'],
+ [3,'撒母耳膏立的以色列第一位王是誰？','掃羅','撒上 10:1'],
+ [3,'以利亞在哪一座山上與巴力的先知對決？','迦密山','王上 18:19-40'],
+ [3,'腓利在往迦薩的路上為哪一位官員講解以賽亞書並施洗？','埃提阿伯（衣索比亞）的太監','徒 8:26-39'],
+ [3,'加拉太書說聖靈所結的果子共有幾樣？','九樣','加 5:22-23'],
+ [3,'帶領百姓重建耶路撒冷城牆的是誰？','尼希米','尼 2–6'],
+ [3,'新約聖經共有幾卷？','27 卷',''],
+ [3,'「你們要靠主常常喜樂」是保羅寫給哪個教會的？','腓立比教會','腓 4:4'],
+ [3,'參孫的力氣與什麼有關？','他的頭髮（拿細耳人不剃頭）','士 16:17'],
+ [3,'約瑟被賣到埃及，成了哪位護衛長家中的僕人？','波提乏','創 39:1'],
+ [3,'教會的第一位殉道者是誰？','司提反','徒 7:54-60'],
+ [3,'摩西的哥哥、後來作大祭司的是誰？','亞倫','出 4:14; 28:1'],
+ [4,'請背出約翰福音 3 章 16 節。','神愛世人，甚至將他的獨生子賜給他們，叫一切信他的，不致滅亡，反得永生。','約 3:16'],
+ [4,'說出聖靈所結的九種果子。','仁愛、喜樂、和平、忍耐、恩慈、良善、信實、溫柔、節制','加 5:22-23'],
+ [4,'依序說出摩西五經。','創世記、出埃及記、利未記、民數記、申命記',''],
+ [4,'說出耶穌十二使徒中任意八位。','西門彼得、安得烈、雅各、約翰、腓力、巴多羅買、多馬、馬太、亞勒腓的兒子雅各、達太、奮銳黨的西門、加略人猶大','太 10:2-4'],
+ [4,'登山寶訓「八福」的第一福是什麼？','虛心的人有福了，因為天國是他們的。','太 5:3'],
+ [4,'保羅第一次宣教旅程，與誰一同被差派出去？','巴拿巴（約翰馬可作幫手）','徒 13:2-5'],
+ [4,'背出主禱文的前三句。','我們在天上的父：願人都尊你的名為聖。願你的國降臨；願你的旨意行在地上，如同行在天上。','太 6:9-10'],
+ [4,'哪一位女先知曾在棕樹下審判以色列？','底波拉','士 4:4-5'],
+ [4,'雅各的十二個兒子中，誰是約瑟同母所生的弟弟？','便雅憫','創 35:18, 24'],
+ [4,'但以理三位朋友的巴比倫名字是什麼？','沙得拉、米煞、亞伯尼歌','但 1:7'],
+ [4,'背出詩篇 23 篇第 1 節。','耶和華是我的牧者，我必不致缺乏。','詩 23:1'],
+ [4,'以斯帖成為哪一位波斯王的王后？','亞哈隨魯王','斯 2:16-17']
+];
+const CARDS = [
+  {id:'walk', name:'保送', w:3, text:'投手四壞球！打者直接上一壘，壘上被擠到的跑者往前推進。'},
+  {id:'k', name:'三振', w:2, text:'被三振了！打者不用答題，直接出局。'},
+  {id:'sac', name:'犧牲打', w:2, text:'打者出局換取推進：壘上所有跑者前進一個壘。', need:'runners'},
+  {id:'steal', name:'盜壘', w:2, text:'跑者趁隙起跑！壘上所有跑者前進一個壘，打者照常打擊。', need:'runners'},
+  {id:'dp', name:'雙殺危機', w:2, text:'這一題答錯算兩個出局，一壘跑者也會被刺殺。', need:'runner1'},
+  {id:'ph', name:'代打', w:2, text:'可以派出代打！本題全隊可以討論，由隊長作答。'}
+];
+
+const store = {
+  get(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let uid = Date.now();
+const mkQ = (lv,q,a,ref,book) => ({id:'q'+(uid++), lv:+lv, q, a, ref:ref||'', book:normBook(book, ref)});
+
+let bank = store.get('bb_bank') || DEFAULT_Q.map(r => mkQ(...r));
+bank.forEach(q => { if (!q.book) q.book = normBook('', q.ref); });
+let S = store.get('bb_state') || freshGame({teams:['約書亞隊','迦勒隊'], innings:5, timer:30, cardP:0.2, books:[], general:true});
+if (!Array.isArray(S.cfg.books)) S.cfg.books = [];
+if (S.cfg.general === undefined) S.cfg.general = true;
+function inScope(q){
+  const b = S.cfg.books;
+  if (!b.length) return true;
+  if (q.book === GENERAL) return S.cfg.general;
+  return b.includes(q.book);
+}
+const scopePool = lv => bank.filter(q => q.lv===lv && inScope(q));
+function scopeLabel(){
+  const b = S.cfg.books; if (!b.length) return '全本聖經';
+  const ot = ALL_BOOKS.filter(x=>x.t==='舊約').map(x=>x.name), nt = ALL_BOOKS.filter(x=>x.t==='新約').map(x=>x.name);
+  if (b.length===ot.length && ot.every(x=>b.includes(x))) return '舊約';
+  if (b.length===nt.length && nt.every(x=>b.includes(x))) return '新約';
+  for (const g of BOOK_GROUPS){ const n = g.books.map(x=>x.name); if (b.length===n.length && n.every(x=>b.includes(x))) return g.g; }
+  return b.length<=3 ? b.join('、') : `${b.slice(0,2).join('、')} 等 ${b.length} 卷`;
+}
+let timerId = null, timeLeft = 0;
+
+function freshGame(cfg){
+  return {
+    cfg, inning:1, half:0, outs:0, bases:[false,false,false],
+    runs:[Array(cfg.innings).fill(null), Array(cfg.innings).fill(null)],
+    phase:'start', q:null, card:null, mod:null, msg:null, used:[], log:[], over:false
+  };
+}
+function save(){ store.set('bb_state', S); store.set('bb_bank', bank); }
+
+/* ---------- game logic ---------- */
+const total = t => S.runs[t].reduce((s,v)=>s+(v||0),0);
+function addRuns(n){
+  const i = S.inning-1;
+  if (i >= S.runs[S.half].length){ S.runs[0].push(null); S.runs[1].push(null); }
+  S.runs[S.half][i] = (S.runs[S.half][i]||0) + n;
+}
+function advance(n, batter){
+  let r = 0; const b = S.bases, nb = [false,false,false];
+  for (let i=2;i>=0;i--) if (b[i]){ const t=i+n; if (t>=3) r++; else nb[t]=true; }
+  if (batter){ if (n>=4) r++; else nb[n-1]=true; }
+  S.bases = nb; if (r) addRuns(r); return r;
+}
+function walk(){
+  const b = S.bases; let r = 0;
+  if (b[0]&&b[1]&&b[2]) r=1;
+  else if (b[0]&&b[1]) b[2]=true;
+  else if (b[0]) b[1]=true;
+  b[0]=true; if (r) addRuns(r); return r;
+}
+const hasRunners = () => S.bases.some(Boolean);
+function tag(){ return (S.half?'▼':'▲')+S.inning; }
+function teamName(t=S.half){ return S.cfg.teams[t]; }
+function log(text){ S.log.unshift({t:tag(), text}); }
+
+function startAtBat(){
+  S.q=null; S.mod=null; S.msg=null; S.card=null;
+  const i = S.inning-1;
+  if (S.runs[S.half][i]==null) S.runs[S.half][i]=0;
+  if (S.cfg.cardP>0 && Math.random()<S.cfg.cardP){
+    const pool = CARDS.filter(c => !c.need || (c.need==='runners'&&hasRunners()) || (c.need==='runner1'&&S.bases[0]));
+    const sum = pool.reduce((s,c)=>s+c.w,0); let x = Math.random()*sum;
+    S.card = pool.find(c => (x-=c.w) < 0) || pool[0];
+    S.phase='card';
+  } else S.phase='choose';
+  save(); render();
+}
+function applyCard(){
+  const c = S.card; let r;
+  switch(c.id){
+    case 'walk': r = walk(); log(`${teamName()}：保送上壘${r?`，擠回 ${r} 分`:''}`); finish(true, `保送上壘${r?`，擠回 ${r} 分！`:''}`); return;
+    case 'k': S.outs++; log(`${teamName()}：特殊牌三振出局`); finish(false,'三振出局'); return;
+    case 'sac':
+      S.outs++;
+      if (S.outs>=3){ log(`${teamName()}：犧牲打，第三個出局`); finish(false,'犧牲打出局，三出局'); return; }
+      r = advance(1,false); log(`${teamName()}：犧牲打，跑者推進${r?`，得 ${r} 分`:''}`); finish(true, `犧牲打成功${r?`，送回 ${r} 分`:'，跑者推進'}`); return;
+    case 'steal':
+      r = advance(1,false); log(`${teamName()}：盜壘成功${r?`，盜回本壘得 ${r} 分`:''}`);
+      if (checkWalkoff()) return;
+      S.mod=null; S.phase='choose'; S.card=null; toast(r?`盜回本壘 +${r}`:'盜壘成功'); break;
+    case 'dp': S.mod='dp'; S.phase='choose'; S.card=null; break;
+    case 'ph': S.mod='ph'; S.phase='choose'; S.card=null; break;
+  }
+  save(); render();
+}
+function pickQuestion(lv){
+  const all = scopePool(lv);
+  let pool = all.filter(q => !S.used.includes(q.id));
+  if (!pool.length){
+    const ids = all.map(q=>q.id);
+    if (!ids.length){ toast(`「${scopeLabel()}」範圍內沒有${LV[lv].name}的題目`); return; }
+    S.used = S.used.filter(id => !ids.includes(id)); pool = all;
+    toast(`${LV[lv].name}題目已用完，重新洗牌`);
+  }
+  const q = pool[Math.floor(Math.random()*pool.length)];
+  S.used.push(q.id); S.q = {...q, shown:false}; S.phase='question';
+  save(); render(); startTimer();
+}
+function answer(ok){
+  stopTimer(); const q = S.q, L = LV[q.lv];
+  if (ok){
+    const r = advance(L.bases, true);
+    log(`${teamName()}：${L.name}（答對）${r?`，得 ${r} 分`:''}`);
+    finish(true, `${L.name}！${r?`跑回 ${r} 分`:'安全上壘'}`);
+  } else {
+    if (S.mod==='dp' && S.bases[0] && S.outs<2){
+      S.outs+=2; S.bases[0]=false; log(`${teamName()}：答錯，雙殺！`); finish(false,'雙殺！兩人出局');
+    } else {
+      S.outs++; log(`${teamName()}：挑戰${L.name}失敗，出局`); finish(false,'答錯，出局');
+    }
+  }
+}
+function checkWalkoff(){
+  const last = S.cfg.innings;
+  if (S.half===1 && S.inning>=last && total(1)>total(0)){
+    S.over=true; S.phase='over'; log(`${teamName(1)} 再見得分，比賽結束`); save(); render(); return true;
+  }
+  return false;
+}
+function finish(good, text){
+  S.msg = {good, text}; S.card=null;
+  if (checkWalkoff()) return;
+  if (S.outs>=3){
+    S.msg.text += '　三出局，攻守交換';
+    S.phase='switch';
+  } else S.phase='result';
+  save(); render();
+}
+function nextHalf(){
+  S.outs=0; S.bases=[false,false,false];
+  const last = S.cfg.innings;
+  if (S.half===0){
+    if (S.inning>=last && total(1)>total(0)){ S.over=true; S.phase='over'; log('主隊領先，比賽結束'); save(); render(); return; }
+    S.half=1;
+  } else {
+    if (S.inning>=last){ S.over=true; S.phase='over'; log('比賽結束'); save(); render(); return; }
+    S.half=0; S.inning++;
+  }
+  startAtBat();
+}
+
+/* ---------- timer ---------- */
+function startTimer(){
+  stopTimer(); if (!S.cfg.timer) return;
+  timeLeft = S.cfg.timer; paintTimer();
+  timerId = setInterval(()=>{ timeLeft--; paintTimer(); if (timeLeft<=0){ stopTimer(); } }, 1000);
+}
+function stopTimer(){ if (timerId){ clearInterval(timerId); timerId=null; } }
+function paintTimer(){
+  const el = $('timer'); if (!el) return;
+  el.textContent = timeLeft>0 ? timeLeft : '時間到';
+  el.classList.toggle('low', timeLeft<=5);
+}
+
+/* ---------- render ---------- */
+function render(){
+  renderBoard(); renderDiamond(); renderPanel(); renderLog();
+}
+function renderBoard(){
+  const n = S.runs[0].length;
+  let h = '<tr><th></th>' + Array.from({length:n},(_,i)=>`<th>${i+1}</th>`).join('') + '<th>R</th></tr>';
+  for (let t=0;t<2;t++){
+    h += `<tr><td class="team${!S.over&&S.half===t?' bat':''}">${esc(S.cfg.teams[t])}</td>`;
+    for (let i=0;i<n;i++){
+      const v = S.runs[t][i]; const now = !S.over && S.half===t && S.inning===i+1;
+      h += `<td class="${v==null?'empty':''}${now?' now':''}">${v==null?'·':v}</td>`;
+    }
+    h += `<td class="total">${total(t)}</td></tr>`;
+  }
+  $('lineScore').innerHTML = h;
+  $('inningTag').textContent = S.over ? 'FINAL' : `${S.half?'▼':'▲'} 第 ${S.inning} 局`;
+  $('outLights').innerHTML = [0,1,2].map(i=>`<i class="${i<S.outs?'on':''}"></i>`).join('');
+  const left = [1,2,3,4].map(l => scopePool(l).filter(q=>!S.used.includes(q.id)).length);
+  $('bankLeft').textContent = `剩餘題目 ${left.join(' / ')}`;
+  $('scopeTag').textContent = scopeLabel();
+}
+function renderDiamond(){
+  const B = [[160,100],[100,40],[40,100]];
+  let s = `<path d="M100 165 L165 100 L100 35 L35 100 Z" fill="#1d4a37" stroke="#f1eee2" stroke-opacity=".55" stroke-width="2"/>
+  <circle cx="100" cy="102" r="9" fill="#2e5d47"/>
+  <path d="M100 165 L5 70 M100 165 L195 70" stroke="#f1eee2" stroke-opacity=".25" stroke-width="1.5"/>`;
+  B.forEach(([x,y],i)=>{
+    const on = S.bases[i];
+    s += `<g transform="translate(${x} ${y})"><rect class="${on?'base-on':''}" x="-11" y="-11" width="22" height="22" transform="rotate(45)" fill="${on?'#ffb83f':'#0b231c'}" stroke="#f1eee2" stroke-width="2"/></g>`;
+    if (on) s += `<circle cx="${x}" cy="${y}" r="20" fill="none" stroke="#ffb83f" stroke-opacity=".35" stroke-width="3"/>`;
+  });
+  s += `<path d="M90 160 h20 v6 l-10 9 l-10 -9 z" fill="#f1eee2"/>`;
+  ['一壘','二壘','三壘'].forEach((t,i)=>{
+    const [x,y]=B[i]; const dy = i===1 ? -22 : 30;
+    s += `<text x="${x}" y="${y+dy}" text-anchor="middle" font-size="11" fill="#a9bdb2" font-family="Noto Sans TC, sans-serif">${t}</text>`;
+  });
+  $('diamond').innerHTML = s;
+  $('batTeam').innerHTML = S.over ? '比賽結束' : `打擊中：<span>${esc(teamName())}</span>`;
+}
+function modPill(){
+  if (S.mod==='dp') return '<span class="pill mod">雙殺危機：答錯兩人出局</span>';
+  if (S.mod==='ph') return '<span class="pill mod">代打：全隊可討論</span>';
+  return '';
+}
+function renderPanel(){
+  const p = $('panel'); let h='';
+  const head = `<div class="eyebrow">${tag()} · ${esc(teamName())} 進攻 · ${S.outs} 出局</div>`;
+  switch(S.phase){
+    case 'start':
+      h = `<div class="eyebrow">準備開賽</div>
+        <p class="result">${esc(S.cfg.teams[0])} 對 ${esc(S.cfg.teams[1])}</p>
+        <p class="sub">${S.cfg.innings} 局制，三出局換局。打者選擇挑戰等級，答對就依等級推進：一壘安打前進一個壘，全壘打所有人回本壘。</p>
+        <div class="row"><button class="btn primary big" id="go">Play Ball！第一位打者上場</button></div>
+        <p class="kbd">投影時可用鍵盤：1–4 選等級、空白鍵看答案、Y 答對、N 答錯、Enter 下一位。</p>`;
+      break;
+    case 'card':
+      h = head + `<div class="special"><div class="eyebrow">特殊牌</div><h3>${S.card.name}</h3><p>${S.card.text}</p></div>
+        <div class="row"><button class="btn primary big" id="applyCard">${['dp','ph'].includes(S.card.id)?'了解，選擇挑戰等級':'執行'}</button></div>`;
+      break;
+    case 'choose':
+      h = head + (S.mod?`<div>${modPill()}</div>`:'') + `<div class="choose">` +
+        [1,2,3,4].map(l=>{
+          const all = scopePool(l).length, left = scopePool(l).filter(q=>!S.used.includes(q.id)).length;
+          return `<button class="hit${l===4?' hr':''}" data-lv="${l}" ${all?'':'disabled'}><b>${LV[l].tag}</b><span>${LV[l].name}</span><em>${all?`${LV[l].hint} · 剩 ${left} 題 · 鍵 ${l}`:'這個範圍沒有題目'}</em></button>`;
+        }).join('') + `</div>`;
+      break;
+    case 'question': {
+      const q = S.q;
+      h = head + `<div class="qbox">
+        <div class="qmeta"><div class="row"><span class="pill">${LV[q.lv].name}</span>${modPill()}</div><div class="timer" id="timer">${S.cfg.timer?'':''}</div></div>
+        <p class="qtext">${esc(q.q)}</p>
+        ${q.shown?`<div class="answer">${esc(q.a)}${q.ref?`<small>${esc(q.ref)}</small>`:''}</div>`:''}
+        <div class="row">
+          ${q.shown?'':'<button class="btn big" id="reveal">顯示答案</button>'}
+          <button class="btn ok big" id="yes">答對</button>
+          <button class="btn ng big" id="no">答錯</button>
+        </div></div>`;
+      break; }
+    case 'result':
+    case 'switch':
+      h = head + `<p class="result ${S.msg.good?'good':'bad'}">${esc(S.msg.text)}</p>
+        <p class="sub">比數 ${esc(S.cfg.teams[0])} ${total(0)}：${total(1)} ${esc(S.cfg.teams[1])}</p>
+        <div class="row"><button class="btn primary big" id="next">${S.phase==='switch'?'攻守交換':'下一位打者'}</button></div>`;
+      break;
+    case 'over': {
+      const a=total(0), b=total(1);
+      const w = a===b ? '雙方平手' : `${a>b?S.cfg.teams[0]:S.cfg.teams[1]} 獲勝`;
+      h = `<div class="eyebrow">比賽結束</div><p class="result good">${esc(w)}</p>
+        <p class="sub">最終比數 ${esc(S.cfg.teams[0])} ${a}：${b} ${esc(S.cfg.teams[1])}</p>
+        <div class="row"><button class="btn primary big" id="again">再來一場</button></div>`;
+      break; }
+  }
+  p.innerHTML = h;
+  if (S.phase==='question' && S.cfg.timer){ if (timerId) paintTimer(); else { $('timer').textContent = timeLeft>0?timeLeft:''; } }
+  bindPanel();
+}
+function bindPanel(){
+  const on = (id,fn) => { const el=$(id); if (el) el.onclick=fn; };
+  on('go', startAtBat);
+  on('applyCard', applyCard);
+  on('reveal', ()=>{ S.q.shown=true; save(); renderPanel(); });
+  on('yes', ()=>answer(true));
+  on('no', ()=>answer(false));
+  on('next', ()=> S.phase==='switch' ? nextHalf() : startAtBat());
+  on('again', ()=>openSheet('setupSheet'));
+  document.querySelectorAll('.hit').forEach(b => b.onclick = () => pickQuestion(+b.dataset.lv));
+}
+function renderLog(){
+  $('log').innerHTML = S.log.length ? S.log.map(l=>`<li><b>${l.t}</b><span>${esc(l.text)}</span></li>`).join('')
+    : '<li class="empty-note">比賽開始後，每一個打席的結果會記在這裡。</li>';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select,button') || document.querySelector('.sheet:not([hidden])')) return;
+  const k = e.key.toLowerCase();
+  if (S.phase==='choose' && ['1','2','3','4'].includes(k)) pickQuestion(+k);
+  else if (S.phase==='question'){
+    if (k===' '){ e.preventDefault(); if(!S.q.shown){ S.q.shown=true; save(); renderPanel(); } }
+    else if (k==='y') answer(true); else if (k==='n') answer(false);
+  } else if (k==='enter'){
+    const b = $('next')||$('go')||$('applyCard'); if (b){ e.preventDefault(); b.click(); }
+  }
+});
+
+/* ---------- sheets ---------- */
+function openSheet(id){
+  $(id).hidden=false;
+  if (id==='setupSheet'){ $('tA').value=S.cfg.teams[0]; $('tB').value=S.cfg.teams[1]; $('sInn').value=S.cfg.innings; $('sTime').value=S.cfg.timer; $('sCard').value=S.cfg.cardP; $('setupScope').textContent=scopeLabel(); }
+  if (id==='bankSheet'){ fillBookSelects(); renderBank(); if (S.cfg.books.length) $('aiScope').value = scopeLabel()==='舊約'||scopeLabel()==='新約' ? scopeLabel() : S.cfg.books.join('、'); }
+  if (id==='scopeSheet'){ draft = {books:new Set(S.cfg.books), general:S.cfg.general}; renderScope(); }
+}
+function closeSheet(id){ $(id).hidden=true; if (id==='scopeSheet' && !$('setupSheet').hidden) $('setupScope').textContent=scopeLabel(); render(); }
+
+/* 經卷範圍 */
+let draft = null;
+const bookCount = name => bank.filter(q=>q.book===name).length;
+function renderScope(){
+  $('bookGroups').innerHTML = BOOK_GROUPS.map((g,gi) => `
+    <div class="bgroup"><div class="bgroup-h"><span class="eyebrow">${g.t} · ${g.g}</span><button data-g="${gi}">${g.books.every(b=>draft.books.has(b.name))?'取消全選':'全選'}</button></div>
+    <div class="books">${g.books.map(b => { const n = bookCount(b.name); return `<button class="bk" data-b="${esc(b.name)}" aria-pressed="${draft.books.has(b.name)}">${esc(b.name)}${n?`<sup>${n}</sup>`:''}</button>`; }).join('')}</div></div>`).join('');
+  $('scopeGeneral').checked = draft.general;
+  $('scopeGeneral').disabled = !draft.books.size;
+  const tmp = S.cfg.books, tg = S.cfg.general; S.cfg.books=[...draft.books]; S.cfg.general=draft.general;
+  const counts = [1,2,3,4].map(l=>scopePool(l).length), label = scopeLabel();
+  S.cfg.books=tmp; S.cfg.general=tg;
+  const missing = [1,2,3,4].filter((l,i)=>!counts[i]).map(l=>LV[l].name);
+  $('scopeSum').innerHTML = `<span>範圍：<strong>${esc(label)}</strong></span>` + [1,2,3,4].map((l,i)=>`<span>${LV[l].tag} <b>${counts[i]}</b></span>`).join('') +
+    (missing.length ? `<span class="note" style="color:#ff9d8f">${missing.join('、')}沒有題目，可到題庫用 AI 出題補上</span>` : '');
+  $('bookGroups').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { const n=b.dataset.b; draft.books.has(n)?draft.books.delete(n):draft.books.add(n); renderScope(); });
+  $('bookGroups').querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
+    const names = BOOK_GROUPS[+b.dataset.g].books.map(x=>x.name), allOn = names.every(n=>draft.books.has(n));
+    names.forEach(n => allOn ? draft.books.delete(n) : draft.books.add(n)); renderScope();
+  });
+}
+document.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
+  const k = b.dataset.q;
+  if (k==='all') draft.books = new Set();
+  if (k==='ot') draft.books = new Set(ALL_BOOKS.filter(x=>x.t==='舊約').map(x=>x.name));
+  if (k==='nt') draft.books = new Set(ALL_BOOKS.filter(x=>x.t==='新約').map(x=>x.name));
+  if (k==='has') draft.books = new Set(ALL_BOOKS.filter(x=>bookCount(x.name)).map(x=>x.name));
+  renderScope();
+});
+$('scopeGeneral').onchange = e => { draft.general = e.target.checked; renderScope(); };
+$('scopeDone').onclick = () => {
+  S.cfg.books = ALL_BOOKS.map(x=>x.name).filter(n=>draft.books.has(n)); S.cfg.general = draft.general;
+  save(); closeSheet('scopeSheet'); toast(`範圍：${scopeLabel()}`);
+};
+$('btnScope').onclick = () => openSheet('scopeSheet');
+$('scopeTagBtn').onclick = () => openSheet('scopeSheet');
+$('setupScopeBtn').onclick = () => openSheet('scopeSheet');
+function fillBookSelects(){
+  const opts = BOOK_GROUPS.map(g=>`<optgroup label="${g.t}・${g.g}">${g.books.map(b=>`<option>${b.name}</option>`).join('')}</optgroup>`).join('');
+  const fb = $('fBook').value;
+  $('fBook').innerHTML = `<option value="">全部經卷</option><option value="__scope">目前範圍</option><option>${GENERAL}</option>` + opts;
+  $('fBook').value = fb || '';
+  const ab = $('aB').value;
+  $('aB').innerHTML = `<option value="">依出處自動判斷</option><option>${GENERAL}</option>` + opts;
+  $('aB').value = ab || '';
+}
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeSheet(b.dataset.close));
+document.querySelectorAll('.sheet').forEach(s => s.addEventListener('click', e => { if (e.target===s) closeSheet(s.id); }));
+$('btnSetup').onclick = () => openSheet('setupSheet');
+$('btnBank').onclick = () => openSheet('bankSheet');
+$('setupForm').onsubmit = e => {
+  e.preventDefault(); stopTimer();
+  S = freshGame({teams:[$('tA').value.trim()||'客隊', $('tB').value.trim()||'主隊'], innings:+$('sInn').value, timer:+$('sTime').value, cardP:+$('sCard').value, books:S.cfg.books.slice(), general:S.cfg.general});
+  save(); closeSheet('setupSheet'); toast('新比賽已建立');
+};
+
+function toast(t){ const el=$('toast'); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>el.hidden=true, 2200); }
+
+/* bank */
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-selected', x===b));
+  document.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane!==b.dataset.tab);
+});
+function renderBank(){
+  $('bankCounts').innerHTML = [1,2,3,4].map(l=>`<span>${LV[l].name} <b>${bank.filter(q=>q.lv===l).length}</b></span>`).join('') + `<span>已用 <b>${S.used.length}</b></span>`;
+  const f = +$('fLv').value, fb = $('fBook').value;
+  const list = bank.filter(q => (!f || q.lv===f) && (!fb || (fb==='__scope' ? inScope(q) : q.book===fb)));
+  $('qList').innerHTML = list.length ? list.map(q=>`<li><span class="lv">${LV[q.lv].tag}</span><div><div class="t">${esc(q.q)}</div><div class="a"><span class="bkname">${esc(q.book)}</span>｜${esc(q.a)}${q.ref?'｜'+esc(q.ref):''}</div></div><button data-del="${q.id}" aria-label="刪除">刪除</button></li>`).join('')
+    : '<li><span></span><span class="empty-note">這個等級還沒有題目。可以用「新增一題」、「批次匯入」或「AI 出題」補上。</span><span></span></li>';
+  $('qList').querySelectorAll('[data-del]').forEach(b => b.onclick = () => { bank = bank.filter(q=>q.id!==b.dataset.del); save(); renderBank(); });
+}
+$('fLv').onchange = renderBank;
+$('fBook').onchange = renderBank;
+$('btnResetUsed').onclick = () => { S.used=[]; save(); renderBank(); toast('已用題目已重置'); };
+let restoreArmed = false;
+$('btnRestore').onclick = e => {
+  if (!restoreArmed){ restoreArmed=true; e.target.textContent='再按一次確認還原'; setTimeout(()=>{restoreArmed=false; e.target.textContent='還原內建題庫';},3000); return; }
+  bank = DEFAULT_Q.map(r=>mkQ(...r)); S.used=[]; restoreArmed=false; e.target.textContent='還原內建題庫'; save(); renderBank(); toast('已還原內建題庫');
+};
+$('addForm').onsubmit = e => {
+  e.preventDefault();
+  bank.push(mkQ($('aLv').value, $('aQ').value.trim(), $('aA').value.trim(), $('aR').value.trim(), $('aB').value));
+  $('aQ').value=''; $('aA').value=''; $('aR').value=''; save(); renderBank(); toast('已加入題庫');
+};
+const LVMAP = {'1':1,'2':2,'3':3,'4':4,'一壘':1,'二壘':2,'三壘':3,'全壘打':4,'1b':1,'2b':2,'3b':3,'hr':4};
+$('impGo').onclick = () => {
+  let n=0, bad=0;
+  $('impText').value.split('\n').forEach(line => {
+    if (!line.trim()) return;
+    const [lv,q,a,ref] = line.split(/[|｜]/).map(s=>(s||'').trim());
+    const L = LVMAP[(lv||'').toLowerCase()];
+    if (!L || !q || !a){ bad++; return; }
+    bank.push(mkQ(L,q,a,ref)); n++;
+  });
+  save(); renderBank(); toast(`匯入 ${n} 題${bad?`，${bad} 行格式不符`:''}`);
+  if (n) $('impText').value='';
+};
+
+/* AI 出題 */
+let aiItems = [], aiCtl = null, sample = null;
+$('tabAiBtn').hidden = true;
+(async () => {
+  try { sample = await window.claude?.use?.('sample'); } catch(e){ sample = null; }
+  if (sample) $('tabAiBtn').hidden = false;
+})();
+function aiMsg(code){
+  return ({not_granted:'沒有取得使用 Claude 的許可，AI 出題已關閉。', sampling_disabled:'這個帳號目前無法使用 AI 出題。', rate_limited:'請求太頻繁，請稍後再試。', invalid_json:'回傳格式有誤，請再按一次「產生題目」。', session_expired:'登入已過期，請重新登入後再試。', refused:'這個範圍無法產生題目，請換個說法。'})[code] || '連線中斷，請再試一次。';
+}
+$('aiGo').onclick = async () => {
+  if (!sample) return;
+  const scope = $('aiScope').value.trim() || '全本聖經', aud = $('aiAud').value, n = +$('aiN').value;
+  aiCtl = new AbortController();
+  $('aiGo').disabled = true; $('aiStop').hidden = false; $('aiAddRow').hidden = true; $('aiList').innerHTML='';
+  $('aiStatus').textContent = '正在出題，約需 20–60 秒…';
+  const prompt = `你是台灣教會團契的查經遊戲出題者。請為「棒球查經」遊戲出題。
+範圍：${scope}
+對象：${aud}
+經文版本：中文和合本（使用和合本的人名、地名與用字，繁體中文）。
+請出 4 個等級、每個等級 ${n} 題：
+- level 1 一壘安打：簡單，基本人物、地點、事件
+- level 2 二壘安打：中等，需要記得細節
+- level 3 三壘安打：難，章節出處、較少人注意的細節
+- level 4 全壘打：非常難，背經、列舉多項、綜合比較
+規則：答案要明確、可以當場判定對錯；每題附上經文出處（例如「徒 2:1-4」）；只出你確定符合經文的題目，不要編造。範圍有多卷書時，題目平均分配到各卷。
+book 欄位填和合本完整卷名（例如「使徒行傳」「哥林多前書」）。
+只回覆一個 JSON 陣列，每個元素格式：{"level":1,"book":"使徒行傳","q":"題目","a":"答案","ref":"徒 2:1-4"}`;
+  try {
+    const data = await sample.json(prompt, {signal: aiCtl.signal, cache:false});
+    aiItems = (Array.isArray(data)?data:[]).filter(x => x && LVMAP[String(x.level)] && x.q && x.a)
+      .map(x => ({lv:LVMAP[String(x.level)], q:String(x.q), a:String(x.a), ref:String(x.ref||''), book:normBook(x.book, x.ref), on:true}));
+    renderAi();
+    $('aiStatus').textContent = aiItems.length ? `產生了 ${aiItems.length} 題。請核對經文，取消勾選不要的題目。` : '沒有產生可用的題目，請調整範圍再試。';
+  } catch(e){
+    if (e && e.code==='cancelled') $('aiStatus').textContent='已停止。';
+    else { $('aiStatus').textContent = aiMsg(e && e.code); if (['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(e && e.code)) $('aiGo').hidden = true; }
+  } finally { $('aiGo').disabled=false; $('aiStop').hidden=true; }
+};
+$('aiStop').onclick = () => aiCtl?.abort();
+function renderAi(){
+  $('aiList').innerHTML = aiItems.map((x,i)=>`<li><input type="checkbox" id="ai${i}" ${x.on?'checked':''} aria-label="加入此題"><label for="ai${i}" style="color:inherit"><span class="t">${LV[x.lv].tag}｜${esc(x.q)}</span><span class="a"><span class="bkname">${esc(x.book)}</span>｜${esc(x.a)}${x.ref?'｜'+esc(x.ref):''}</span></label><span></span></li>`).join('');
+  $('aiList').querySelectorAll('input').forEach((c,i)=> c.onchange = () => aiItems[i].on = c.checked);
+  $('aiAddRow').hidden = !aiItems.length;
+}
+$('aiAdd').onclick = () => {
+  const pick = aiItems.filter(x=>x.on); pick.forEach(x => bank.push(mkQ(x.lv,x.q,x.a,x.ref,x.book)));
+  aiItems=[]; renderAi(); save(); renderBank(); toast(`已加入 ${pick.length} 題`);
+  $('aiStatus').textContent='已加入題庫，可到「題目列表」查看。';
+};
+
+render();
+if (S.phase==='question') startTimer();
+})();
+</script>
+
+</body></html>
